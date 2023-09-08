@@ -1,11 +1,11 @@
 pipeline {
     agent any
     
-    environment {
-        DOCKER_USER = credentials('DOCKER_USER')
-        DOCKER_PASSWD = credentials('DOCKER_PASSWD')
-        OC_USER = credentials('OC_USER')
-        OC_PASSWD = credentials('OC_PASSWD')
+    // environment {
+    //     DOCKER_USER = credentials('DOCKER_USER')
+    //     DOCKER_PASSWD = credentials('DOCKER_PASSWD')
+    //     OC_USER = credentials('OC_USER')
+    //     OC_PASSWD = credentials('OC_PASSWD')
     }
     
     stages {
@@ -19,7 +19,7 @@ pipeline {
         stage('Docker Login') {
             steps {
                 // Login to Docker Hub
-                sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWD}"
+                sh "docker login -u madhavkrishna118@gmail.com -p 9010438019"
             }
         }
         
