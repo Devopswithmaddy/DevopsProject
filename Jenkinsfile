@@ -1,68 +1,116 @@
 pipeline {
-    agent any
-    
-    // environment {
-    //     DOCKER_USER = credentials('DOCKER_USER')
-    //     DOCKER_PASSWD = credentials('DOCKER_PASSWD')
-    //     OC_USER = credentials('OC_USER')
-    //     OC_PASSWD = credentials('OC_PASSWD')
-    }
-    
+    agent none
     stages {
-        stage('Checkout Code') {
+        stage('Git checkout') {
+            agent { label 'Build' }
             steps {
-                // Checkout your code from the specified GitHub repository
-                checkout([$class: 'GitSCM', branches: [[name: 'master']], userRemoteConfigs: [[url: 'https://github.com/devopswithcloud/spring-petclinic.git']]])
+                // Get some code from a GitHub repository
+                git 'https://github.com/surya123789/my_own_project.git'
             }
         }
-        
-        stage('Docker Login') {
+        stage('Build') {
+            agent { label 'Build' }
             steps {
-                // Login to Docker Hub
-                sh "docker login -u madhavkrishna118@gmail.com -p 9010438019"
+                sh 'mvn install'
             }
         }
-        
-        stage('Build Docker Image') {
+        stage('SonarQube analysis') {
+            agent { label 'Build' }
             steps {
-                // Build Docker image
-                sh "docker build --no-cache --force-rm -t spring:jenkinsimage ."
+                withSonarQubeEnv('sonarqubedashboard') {
+                    sh 'mvn sonar:sonar'
+    }   // submitted SonarQube taskId is automatically attached to the pipeline context
+  }
+}
+        stage('uploading artifacts to JFROG(artifactory repo)') {
+            agent { label 'Build' }
+            steps {
+                rtUpload (
+                    serverId: 'artifactoryserver',
+                    spec: '''{
+                        "files": [
+                            {
+                            "pattern": "target/**.war",
+                            "target": "maven/"
+                            }
+                        ]
+                     }''',
+ 
+    // Optional - Associate the uploaded files with the following custom build name and build number,
+    // as build artifacts.
+    // If not set, the files will be associated with the default build name and build number (i.e the
+    // the Jenkins job name and number).
+                    buildName: 'my_own_project',
+                    buildNumber: '01',
+                    // Optional - Only if this build is associated with a project in Artifactory, set the project key as follows.
+                    project: 'my_own_project'
+)
             }
         }
-        
-        stage('Tag Docker Image') {
+        stage('Downloading artifactory from JFROG(artifactory repo)') {
+            agent { label 'Docker' }
             steps {
-                // Tag the Docker image
-                sh "docker tag spring:jenkinsimage madhavkrishna118/ubuntu:springjenkins"
+                rtDownload (
+                    serverId: 'artifactoryserver',
+                    spec: '''{
+                        "files": [
+                            {
+                            "pattern": "maven/**.war",
+                            "target": "/home/ubuntu/surya/workspace/my_own_project/"
+                            }
+                        ]
+                     }''',
+ 
+    // Optional - Associate the uploaded files with the following custom build name and build number,
+    // as build artifacts.
+    // If not set, the files will be associated with the default build name and build number (i.e the
+    // the Jenkins job name and number).
+                    buildName: 'my_own_project',
+                    buildNumber: '01',
+                    // Optional - Only if this build is associated with a project in Artifactory, set the project key as follows.
+                    project: 'my_own_project'
+)
             }
         }
-        
-        stage('Push Docker Image') {
+        stage('Git-checkout-docker ') {
+            agent { label 'Docker' }
             steps {
-                // Push Docker image to Docker Hub
-                sh "docker push madhavkrishna118/ubuntu:springjenkins"
+                // Get some code from a GitHub repository
+                git 'https://github.com/surya123789/suryatech.git'
             }
         }
-        
-        stage('OpenShift Login') {
-            steps {
-                // Login to OpenShift
-                sh "oc login https://api.prod.madhavopenshift.shop:6443 -u ${OC_USER} -p ${OC_PASSWD} --insecure-skip-tls-verify=true"
-            }
+        stage('build-Image') {
+                // Build the images from dockerfile
+              agent { label 'Docker' }
+		     	 steps {
+			      	sh 'docker build -t="surya123789/my_own_project:latest" .'
+		        }
         }
-        
-        stage('Select Project') {
+    	stage('Docker-login') {
+            agent { label 'Docker' }
+		      steps {
+		          sh 'docker login -u surya123789 -p aDm1n@123'
+			}
+	}
+	    stage('Dockerpush') {
+			  agent { label 'Docker' }
+          steps {
+				     sh 'docker push surya123789/my_own_project:latest'
+		             	}
+	}
+	   stage('pull image') {
+			 agent { label 'Docker' }
             steps {
-                // Shift to the desired OpenShift project
-                sh "oc project java-springboot"
-            }
+				      sh 'docker pull surya123789/my_own_project:latest'
+			                  }
+	    	}
+	stage('Deploy App') {
+		agent { label 'Build' }
+           steps {
+              script {
+                kubernetesDeploy(configs: "deploy.yml", kubeconfigId: "kubernetes", enableConfigSubstitution: true)
         }
-        
-        stage('Deploy to OpenShift') {
-            steps {
-                // Deploy to OpenShift
-                sh "oc rollout latest dc/java-springboot"
-            }
-        }
+      }
     }
+ }
 }
